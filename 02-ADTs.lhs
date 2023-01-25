@@ -36,8 +36,7 @@ Enumerations
 >
 > isRed :: Color -> Bool
 > isRed Red   = True
-> isRed Green = False
-> isRed Blue  = False
+> isRed _ = False
 
 * Load this file into GHCi and type `Red` at the prompt.  What happens?
 
@@ -114,7 +113,7 @@ More general ADTs
 > record3 = TopSecret 17 False ('x',10)
 >
 > recordAge :: Record -> Integer
-> recordAge (NameAndAge _ age)          = age
+> recordAge (NameAndAge name age)          = age
 > recordAge (AddressAndEmail _ _)       = 0
 > recordAge (TopSecret age True _)      = age
 > recordAge (TopSecret _ False (_,age)) = age
@@ -174,25 +173,36 @@ Removing the parantheses makes unMaybe have more than argument while the paranth
 > evenOddInteger (Yes n) = if even n then n `div` 2 else n*2
 
 * Describe in English what values of type `Record` look like.
-S
+String Name and Integer Age, String Address and String Email, or Integer, boolean, and a pair of a character and integer (TopSecret).
 * Look at the definition of `recordAge`.  What do you think `_` means?
+In this case, it's like a place holder for something that won't be needed. 
   Predict the output of `recordAge` on the inputs `record1`,
   `record2`, and `record3`.
 
+  Predictions: 6, 0, 10
+
 * Evaluate `recordAge` on `record1`, `record2`, and `record3`.  Were
   you right?  If not, does it change what you think `_` means?
+No, it matches our prediction and our thinking.
 
 * The underscore `_` which can occur on the left-hand side of the `=`
   sign in a function definition is called a *wildcard*.  Can you go
   back and simplify the definition of the `isRed` function using a
   wildcard?  Why or why not?
+Yes, because we could simply replace Green and Blue in  the False condition with the wildcard.
 
 * Write a function of type `MaybeInteger -> Integer` which always
   returns 3, no matter what input it is given.  Make your function
   definition as simple as possible.
 
+> maybeThree :: MaybeInteger -> Integer
+> maybeThree _ = 3
+
 * Can you go back and simplify the `unMaybe` function using a
   wildcard?  Why or why not?
+
+No, because there is no way to use the wildcard to meet the requirements of all the three conditions of unMaybe.
+Or to simplify it. 
 
 * Change the first line of the definition of `recordAge` to
 
@@ -202,11 +212,18 @@ S
     not, in what circumstances would you prefer using one definition
     or the other?
 
+    It doesn't change the behavior, but it gives a warning that name was defined but not used. 
+    We would prefer using one definition in case we need it, otherwise we would prefer using wildcard. 
+
 * What is the difference, if any, between the behavior of `recordAge`
   and `recordAge2`?  Describe what you think `case` does.
 
+There is no difference in the behavior. case is used in defining multiple cases in one function definition. 
+
 * Predict the values of `foo record1` and `foo record2`.  Were you
   right?
+
+Predictions: 20, 23
 
 ![](../images/stop.gif) **When you reach this point, STOP and let Dr. Yorgey know.**
 
