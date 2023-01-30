@@ -113,7 +113,7 @@ More general ADTs
 > record3 = TopSecret 17 False ('x',10)
 >
 > recordAge :: Record -> Integer
-> recordAge (NameAndAge name age)          = age
+> recordAge (NameAndAge _ age)          = age
 > recordAge (AddressAndEmail _ _)       = 0
 > recordAge (TopSecret age True _)      = age
 > recordAge (TopSecret _ False (_,age)) = age
@@ -260,17 +260,46 @@ Recursive ADTs
 * Give three different examples of values of type `Nat` (besides
   `three`).
 
+> zero :: Nat
+> zero = Z
+> one :: Nat
+> one = S Z
+> two :: Nat
+> two = S (S Z)
+
+
 * Describe in English what values of type `Nat` look like.  Why do you
   think it is called `Nat`?
 
+They are either of constructor S where they are passed another value of type
+nat, or they are constructor Z where they are do not have an output. It sounds
+like natural, so we think it might refer to natural numbers where the level of
+recursion might refer to the corresponding natural number.
+
 * What does `natToInteger` do?  How does it work?
+
+It converts Nat to Integer by counting the number of layers of recursion.
 
 * Try `natPlus` on some examples.  What does it do?  Can you explain
   how it works?
 
+Recursively adds two Nats and returns a new Nat value.
+
 * Give three different examples of values of type `IntList`.
 
+> list1 :: IntList
+> list1 = Cons 5 (Cons 6 Empty)
+
+> list2 :: IntList
+> list2 = Empty
+
+> list3 :: IntList
+> list3 = Cons 2 (Cons 3 (Cons 4 Empty))
+
 * Describe in English what values of type `IntList` look like.
+
+It looks like an integer, and an IntList, which contains the next integer,
+and another IntList and so on until it reaches one of type Empty.
 
 * Write a function `intListLengthNat :: IntList -> Nat` which works
   like `intListLength` but returns a `Nat` instead of an `Integer`.
@@ -279,14 +308,32 @@ Recursive ADTs
     IntList` satisfies `natToInteger (intListLengthNat list) ==
     intListLength list`.
 
+> intListLengthNat :: IntList -> Nat
+> intListLengthNat Empty       = Z
+> intListLengthNat (Cons _ nL) = S (intListLengthNat nL)
+
 * Write a function `sumIntList :: IntList -> Integer` which adds up
   all the `Integer` values contained in an `IntList`.
+
+> sumIntList :: IntList -> Integer
+> sumIntList Empty       = 0
+> sumIntList (Cons n nL) = n + sumIntList nL
 
 * Write a function `incrIntList :: IntList -> IntList` which adds one
   to all the `Integer` values contained in an `IntList`.
 
+> incrIntList :: IntList -> IntList
+> incrIntList Empty = Empty
+> incrIntList (Cons n nl) = Cons (n + 1) (incrIntList nl)
+
 * Write a function `intListAppend :: IntList -> IntList -> IntList`
   which appends two `IntList`s together into one big `IntList`.
+
+> intListAppend :: IntList -> IntList -> IntList
+> intListAppend Empty Empty = Empty
+> intListAppend (Cons n nl) Empty = Cons n nl
+> intListAppend Empty (Cons n nl) = Cons n nl
+> intListAppend (Cons n nl) (Cons m ml) = Cons n (Cons m (intListAppend nl ml))
 
 * Create an algebraic data type called `ThreeTree`, such that values
   of type `ThreeTree` look like either
@@ -296,19 +343,48 @@ Recursive ADTs
     Don't forget to put `deriving Show` at the end of your definition
     so values of type `ThreeTree` can be displayed in GHCi.
 
+> data ThreeTree where
+>   Leaf   :: Integer -> ThreeTree
+>   Branch :: ThreeTree -> ThreeTree -> ThreeTree -> ThreeTree
+>   deriving Show
+
 * Give three example values of type `ThreeTree`.
+
+> leaf :: ThreeTree
+> leaf = Leaf 6
+
+> oneBranch :: ThreeTree
+> oneBranch = Branch (Leaf 6) (Leaf 4) (Leaf 9)
+
+> twoBranches :: ThreeTree
+> twoBranches = Branch (Leaf 6) (Branch (Leaf 1) (Leaf 16) (Leaf 67)) (Leaf 0)
 
 * Write a function `sumThreeTree :: ThreeTree -> Integer` which adds
   up all the `Integer` values contained in a `ThreeTree`.
 
+> sumThreeTree :: ThreeTree -> Integer
+> sumThreeTree (Leaf n)       = n
+> sumThreeTree (Branch n m o) = sumThreeTree n + sumThreeTree m + sumThreeTree o
+
 * Write a function `incrThreeTree :: ThreeTree -> ThreeTree` which
   adds one to all the `Integer` values contained in a `ThreeTree`.
+
+> incrThreeTree :: ThreeTree -> ThreeTree
+> incrThreeTree (Leaf n) = Leaf (n + 1)
+> incrThreeTree (Branch n m o) = Branch (incrThreeTree n) (incrThreeTree m) (incrThreeTree o)
 
 Feedback
 --------
 
 * How long would you estimate that you spent working on this module?
 
+Three hours
+
 * Were any parts particularly confusing or difficult?
 
+Three Tree and the IntList were particularly confusing. It took some thinking
+to figure out the recursion.
+
 * Record here any questions, comments, or suggestions for improvement.
+
+Make things easier please...
