@@ -1,0 +1,14 @@
+cabal-version:      2.4
+name:               quilt
+version:            0.1.0.0
+synopsis:
+homepage:
+license:            BSD-3-Clause
+author:             Brent Yorgey
+maintainer:         byorgey@gmail.com
+category:           Graphics
+
+library
+    exposed-modules:  QuiltEDSLDeep
+    build-depends:    base >=4.14.1.0, colour, parsec, mtl, containers, haskeline, JuicyPixels
+    default-language: Haskell2010

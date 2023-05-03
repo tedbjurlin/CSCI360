@@ -1,0 +1,9 @@
+int a; int b; int c;
+input a;
+input b;
+while ! (b == 0) {
+    c := b;
+    b := a % b;
+    a := c
+};
+output a

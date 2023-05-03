@@ -1,0 +1,320 @@
+Module 08: Errors
+=================
+
+* Write your team names here: Ted, Thomas, Sarah
+
+In this module, we will explore how to elegantly deal with errors that
+come up during parsing, typechecking, or at runtime.
+
+Begin by copying in your module 7 code from the previous module:
+
+> {-# LANGUAGE GADTSyntax #-}
+>
+
+> import Parsing2
+> import qualified Data.Map as M
+>
+> data Arith where
+>   Lit :: Integer -> Arith
+>   Bin :: Op -> Arith -> Arith -> Arith
+>   Var :: String -> Arith
+>   Let :: String -> Arith -> Arith -> Arith
+>   deriving (Show)
+>
+> data Op where
+>   Plus  :: Op
+>   Minus :: Op
+>   Times :: Op
+>   Div   :: Op
+>   deriving (Show, Eq)
+>
+> data InterpError where
+>   UndefinedVar :: String -> InterpError
+>   DivByZero    :: InterpError
+>   deriving Show
+>
+> type Env = M.Map String Integer
+>
+> interpArith :: Arith -> Env ->Integer
+> interpArith (Lit i) env           = i
+> interpArith (Bin Plus e1 e2) env  = interpArith e1 env + interpArith e2 env
+> interpArith (Bin Minus e1 e2) env = interpArith e1 env - interpArith e2 env
+> interpArith (Bin Times e1 e2) env = interpArith e1 env * interpArith e2 env
+> interpArith (Var var) env           = case M.lookup var env of
+>   Just m  -> m
+>   Nothing -> error ("The variable "++var++" does not exist")
+> interpArith (Let var e1 e2) env   = interpArith e2 (M.insert var (interpArith e1 env) env)
+>
+> interpArith2 :: Arith -> Env -> Either InterpError Integer
+> interpArith2 (Lit i) env           = Right i
+> interpArith2 (Bin Plus e1 e2) env  = case (interpArith2 e1 env, interpArith2 e2 env) of 
+>   (Left err, _) -> Left err
+>   (_, Left err) -> Left err
+>   (Right n, Right m) -> Right (n+m)
+> interpArith2 (Var var) env           = case M.lookup var env of
+>   Just m  -> Right m
+>   Nothing -> Left (UndefinedVar var)
+> interpArith2 (Let var e1 e2) env   = case interpArith2 e1 env of 
+>   Left err -> Left err
+>   Right n -> interpArith2 e2 (M.insert var n env)
+>
+> showInterpError :: InterpError -> String
+> showInterpError (UndefinedVar var) = "The variable "++var++" is not defined."
+> showInterpError DivByZero = "You can't divide by zero, silly goose!"
+>
+> lexer :: TokenParser u
+> lexer = makeTokenParser $ emptyDef
+>   { reservedNames = ["let", "in"] }
+>     -- tell the lexer that "let" and "in" are reserved keywords
+>     -- which may not be used as variable names
+>
+> parens :: Parser a -> Parser a
+> parens     = getParens lexer
+>
+> reservedOp :: String -> Parser ()
+> reservedOp = getReservedOp lexer
+>
+> reserved :: String -> Parser ()
+> reserved = getReserved lexer
+>
+> integer :: Parser Integer
+> integer    = getInteger lexer
+>
+> whiteSpace :: Parser ()
+> whiteSpace = getWhiteSpace lexer
+>
+> identifier :: Parser String
+> identifier = getIdentifier lexer
+>
+> parseArithAtom :: Parser Arith
+> parseArithAtom = (Lit <$> integer) <|> parens parseArith <|> (Var <$> identifier)
+>   <|> parseLet
+>
+> parseLet :: Parser Arith
+> parseLet = Let <$> (reserved "let" *> identifier <* reservedOp "=") <*> (parseArith <* reserved "in") <*> parseArith
+>
+> parseArith :: Parser Arith
+> parseArith = buildExpressionParser table parseArithAtom
+>   where
+>     table = [ [ Infix (Bin Times <$ reservedOp "*") AssocLeft
+>               , Infix (Bin Div   <$ reservedOp "/") AssocLeft 
+>               ]
+>             , [ Infix (Bin Plus  <$ reservedOp "+") AssocLeft
+>               , Infix (Bin Minus <$ reservedOp "-") AssocLeft
+>               ]
+>             ]
+>
+> arith :: Parser Arith
+> arith = whiteSpace *> parseArith <* eof
+>
+> eval :: String -> IO ()
+> eval s = case parse arith s of
+>   Left err  -> print err
+>   Right a   -> case interpArith3 a M.empty of
+>     Left err  -> putStrLn (showInterpError err)
+>     Right out -> print out
+
+Dealing with errors, take 1
+---------------------------
+
+Driver: Ted Bjurlin
+
+The interpreter works, but we have introduced the possibility of
+runtime errors, and we are not dealing with them in a nice way: if a
+variable is undefined, the interpreter simply crashes.  Ideally, the
+interpreter should never crash, but instead return a useful error
+value that can be caught and further processed however we wish.
+
+To do this we will need to change the type of the interpreter again.
+Currently, its type promises that it will always return an `Integer`,
+but this is no longer possible: in case of a runtime error it will not
+be able to return an `Integer`.  (Of course, we could arrange for it
+to return some default `Integer` such as 0 in the case of a runtime
+error, but there would then be no way to distinguish between an
+expression that legitimately evaluated to 0 and one that resulted in a
+runtime error.)
+
+As we have seen (for example, in the type of `parseSome`), the
+possibility of errors can be represented by the `Either` type.
+
+* Create a new data type called `InterpError` to represent runtime
+  errors generated by the interpreter.  For now, it should have only
+  one constructor called `UndefinedVar`, containing a `String` (which
+  will store the *name* of the variable that is undefined).
+
+* Our goal is to change the type of `interpArith` so that it returns
+  `Either InterpError Integer` instead of just `Integer`.  However, at
+  this point if we simply change its type it will not typecheck.
+
+* Create a new function `interpArith2` which has the same type as
+  `interpArith` except that it returns `Either InterpError Integer`
+  instead of `Integer`.  For now, just make `interpArith2` handle
+  `Var`, `Let`, `Bin Plus`, and `Lit`. (Don't bother implementing `Bin
+  Minus` or `Bin Times`; they would be very similar to `Bin Plus`.)
+
+    **WARNING**: this will be very annoying to write.  But unless you
+    write this code you will not appreciate the nicer way we will
+    implement it next!
+
+* Write a function `showInterpError :: InterpError -> String` which
+  displays a nice (human-readable) version of interpreter errors.
+
+* Change the `eval` function to have type `String -> IO ()`, and
+  change it to use `interpArith2` instead of `interpArith`.
+    - If there is a parse error, display the parse error with the
+      `print` function.
+    - If there is a runtime error `err`, display it with `putStrLn
+      (showInterpError err)`.
+    - If the interpreter finishes successfully, display the result
+      with `print`.
+
+* At this point you should be able to test `eval` with expressions
+  that only contain `+`.  For example:
+    - `2++`: should print a parse error.
+    - `2+x`: should print an error message about `x` being undefined.
+    - `2+3`: should successfully evaluate to `5`.
+
+![](../images/green.png)
+
+Dealing with errors, take 2
+---------------------------
+
+* **ROTATE ROLES** and write the name of the new driver here: Sarah
+
+The annoying thing about `interpArith2` is that it had to mix together
+the actual work of interpreting with the work of doing case analysis
+to figure out when a runtime error had occurred.  In this section we
+will explore ways of hiding all the case analysis inside a few general
+combinators which we can then use to implement the interpreter in a
+nicer way.
+
+* Start by creating a function `interpArith3` with the same type as
+  `interpArith2`.  For now just implement the `Lit` and `Var` cases
+  (you can probably just copy them from `interpArith2`).
+
+
+> interpArith3 :: Arith -> Env -> Either InterpError Integer
+> interpArith3 (Lit i) env = Right i 
+> interpArith3 (Bin Plus e1 e2) env = (+) <$> interpArith3 e1 env <*> interpArith3 e2 env
+> interpArith3 (Bin Times e1 e2) env = (*) <$> interpArith3 e1 env <*> interpArith3 e2 env
+> interpArith3 (Bin Minus e1 e2) env = (-) <$> interpArith3 e1 env <*> interpArith3 e2 env
+> interpArith3 (Bin Div e1 e2) env = case interpArith3 e2 env of
+>   Right 0 -> Left DivByZero
+>   n -> div <$> interpArith3 e1 env <*> n
+> interpArith3 (Var var) env = case M.lookup var env of
+>   Just m  -> Right m  
+>   Nothing -> Left (UndefinedVar var)
+> interpArith3 (Let var e1 e2) env = interpArith3 e1 env >>= \x -> interpArith3 e2 (M.insert var x env)
+
+
+* Now implement an operator `(<<$>>) :: (a -> b) -> Either e a ->
+  Either e b`. (If your implementation typechecks, it is probably
+  correct.  Note you should define it directly in this file, not in `Parsing.hs`.) What does this operator do?
+
+  Applies the function a -> b to the right side of the Either.
+
+> (<<$>>) :: (a -> b) -> Either e a -> Either e b
+> (<<$>>) fun (Right n) = Right (fun n)
+> (<<$>>) _ (Left n) = Left n 
+
+* Implement another operator `(<<*>>) :: Either e (a -> b) -> Either e
+  a -> Either e b`.
+
+> (<<*>>) :: Either e (a -> b) -> Either e a -> Either e b
+> (<<*>>) (Left n) _ = Left n
+> (<<*>>) (Right fun) (Right n) = Right (fun n)
+> (<<*>>) (Right fun) (Left n)  = Left n
+
+* Now try things like
+    - `(+) <<$>> Right 2     <<*>> Right 5`
+    - `(+) <<$>> Left "nope" <<*>> Right 6`
+    - `(+) <<$>> Right 2     <<*>> Left "uhuh"`
+    - `(+) <<$>> Left "nope" <<*>> Left "uhuh"`
+
+    Explain what the pattern `f <<$>> ... <<*>> ... <<*>> ...` does.
+
+    The operator is what is applied to the rest of the expression if they're all right,
+    if anything is left it returns the left it failed on. 
+
+* Where have you seen something like this before?
+
+  <$> is similar because it does the same thing but only for parsers
+
+* Now implement all the `Bin` cases for `interpArith3` using these new
+  operators.
+
+
+Now we only have the `Let` case remaining.  It turns out that
+`(<<$>>)` and `(<<*>>)` are not enough to implement the `Let` case,
+since the two recursive calls to `interpArith3` are not independent
+(the second recursive call needs to use an environment extended with
+the result of the first recursive call).
+
+
+* Finish the implementation of `(>>>=)` below.  Note that the second
+  argument to `(>>>=)` is a *function* which takes an `a` and returns
+  an `Either e b`.  What does this operator do?
+
+  It takes in an either, returns the left if the Either returns a left.
+  If the first either returns a right,
+  then it puts that result into the function and gets another either.
+
+> (>>>=) :: Either e a -> (a -> Either e b) -> Either e b
+> Left e1 >>>= _ = Left e1
+> Right a >>>= f = f a
+
+* Now use `(>>>=)` to implement the `Let` case of `interpArith3`.
+
+Dealing with errors, take 3
+---------------------------
+
+As you have probably noticed, `(<<$>>)` and `(<<*>>)` are similar to
+the `(<$>)` and `(<*>)` operators for parsers.  In fact, they are both
+instances of a more general pattern.
+
+* Delete the line `import Prelude hiding ((<$>), (<$), (<*>), (<*),
+  (*>))`.  `Prelude` is always imported implicitly, so we are now
+  importing the more general versions of those operators.
+
+* Change the import of `Parsing` to `Parsing2`.  You can
+  [obtain Parsing2.hs here](../code/Parsing2.hs).  `Parsing2` is
+  identical to `Parsing` except that it does not export specialized
+  versions of the combinators.
+
+* Now change all the uses of `(<<$>>)` and `(<<*>>)` in `interpArith3`
+  to `(<$>)` and `(<*>)`.  Confirm that your code still typechecks and
+  behaves the same way.
+
+* Look at the types of `(<$>)` and `(<*>)` in GHCi.  You can see that
+  they have the same shape as the specific versions for `Parser` and
+  `Either`, but work over any type `f` which supports the same sort of
+  pattern.
+
+* It turns out that `(>>>=)` corresponds to something more general
+  too: change the use of `(>>>=)` to `(>>=)`, and confirm that your
+  code still works.
+
+* As a final comprehensive exercise, extend the language with a
+  division operator. (You can use the Haskell `div` function to
+  perform integer division.)  The interesting thing about division is
+  that it introduces the possibility of a different kind of runtime
+  error, namely, division by zero.  Extend the interpreter so that it
+  does not crash but instead generates an appropriate error when
+  division by zero is attempted.
+
+Feedback
+--------
+
+* How long would you estimate that you spent working on this module?
+- 2ish hours
+
+* Were any parts particularly confusing or difficult?
+- >>>=
+
+* Were any parts particularly fun or interesting?
+- Div
+
+* Record here any other questions, comments, or suggestions for
+  improvement.
+- We don't have any
+- We also attached two pictures of Thomas's dog. Please give your feedback on Chester

@@ -1,0 +1,8 @@
+int n; int fact;
+input n;
+fact := 1;
+while 0 < n {
+    fact := fact * n;
+    n := n - 1
+    };
+output fact
